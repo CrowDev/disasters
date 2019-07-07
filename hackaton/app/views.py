@@ -9,6 +9,7 @@ from ibm_watson.natural_language_understanding_v1 import Features, ConceptsOptio
 from requests_oauthlib import OAuth1Session
 from requests_oauthlib import OAuth1
 import re
+from twilio.rest import Client
 
 
 class Analize(View):
@@ -23,13 +24,11 @@ class Analize(View):
     	url='https://docs.djangoproject.com/en/2.2/topics/db/queries/',
     	features=Features(concepts=ConceptsOptions(limit=20))).get_result()
 		data = json.dumps(response, indent=2)
-		print(json.dumps(response, indent=2))
 		return JsonResponse(json.loads(data), safe=False)
-		#return HttpResponse(json.dumps(response, indent=2))
 
 	def get_data(request):
 		#url = 'https://api.twitter.com/1.1/search/tweets.json?q=earthquakeLA&count=100'
-		disasters = ['earthquake', 'volcano', 'hurricane', 'wildfire', 'storm', 'flood', 'tsunami', 'seaquake', 'wedonttalk', 'cameron']
+		disasters = ['earthquake', 'volcano', 'hurricane', 'wildfire', 'storm', 'flood', 'tsunami', 'seaquake', 'cameron']
 		url = 'https://api.twitter.com/1.1/trends/place.json?id=1'
 
 		# Using OAuth1Session
@@ -43,9 +42,6 @@ class Analize(View):
 		#obtener trends globales
 		r = requests.get(url=url, auth=oauth)
 		trends = r.json()
-		#print(trends)
-		#print('length trends: ')
-		#print(len(trends[0]['trends']))
 		for disaster in disasters:
 			for trend in trends[0]['trends']:
 
@@ -53,8 +49,6 @@ class Analize(View):
 				search_params = search.split('?')
 				params = search_params[1].lower()
 				if disaster in params:
-					print("holi")
-					print(params)
 					search_url = 'https://api.twitter.com/1.1/search/tweets.json?'+params+'&count=50'
 					r = requests.get(url=search_url, auth=oauth)
 
@@ -63,12 +57,28 @@ class Analize(View):
 					for twit in twits['statuses']:
 						texto = texto + twit['text']
 					texto = re.sub(r'[^\x00-\x7f]',r' ',texto)
-					print(texto)
 
 					response = send_request(texto)
 					data = json.dumps(response, indent=2)
+					data = json.loads(data)
+
+					sms = ''
+					for keyword in data['concepts']:
+						sms = sms + '| ' + keyword['text']
+
+					for keyword in data['keywords']:
+						sms = sms + '| ' + keyword['text']
+					account_sid = 'AC11881f9e69b5a2a06cac8266dea4a58c'
+					auth_token = 'af7983bede23294314cb8d27d39a49f5'
+					client = Client(account_sid, auth_token)
+					message = client.messages.create(
+					status_callback='https://puce-mouse-5792.twil.io/auto',
+					body=sms,
+					from_='+56937610247',
+					to='+56984596079'
+					)
 					
-					return JsonResponse(json.loads(data), safe=False)
+					return JsonResponse(data, safe=False)
 	
 		data = {
 			'response': 'no disaster trend'

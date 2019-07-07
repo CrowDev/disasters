@@ -1,12 +1,14 @@
 from django.shortcuts import render
 from django.views.generic import View
 from django.http import JsonResponse, HttpResponse
+from app.watson.watson import send_request
 import json
 import requests
 from ibm_watson import NaturalLanguageUnderstandingV1
 from ibm_watson.natural_language_understanding_v1 import Features, ConceptsOptions
 from requests_oauthlib import OAuth1Session
 from requests_oauthlib import OAuth1
+import re
 
 
 class Analize(View):
@@ -27,7 +29,7 @@ class Analize(View):
 
 	def get_data(request):
 		#url = 'https://api.twitter.com/1.1/search/tweets.json?q=earthquakeLA&count=100'
-		disasters = ['earthquake', 'volcano', 'hurricane', 'wildfire', 'storm', 'flood', 'tsunami', 'seaquake', 'asap', 'epstein', 'marreta', '#七夕の願い事']
+		disasters = ['earthquake', 'volcano', 'hurricane', 'wildfire', 'storm', 'flood', 'tsunami', 'seaquake', 'wedonttalk', 'cameron']
 		url = 'https://api.twitter.com/1.1/trends/place.json?id=1'
 
 		# Using OAuth1Session
@@ -41,77 +43,35 @@ class Analize(View):
 		#obtener trends globales
 		r = requests.get(url=url, auth=oauth)
 		trends = r.json()
+		#print(trends)
+		#print('length trends: ')
+		#print(len(trends[0]['trends']))
 		for disaster in disasters:
 			for trend in trends[0]['trends']:
+
 				search = trend['url']
 				search_params = search.split('?')
 				params = search_params[1].lower()
 				if disaster in params:
 					print("holi")
 					print(params)
-					search_url = 'https://api.twitter.com/1.1/search/tweets.json?'+params
+					search_url = 'https://api.twitter.com/1.1/search/tweets.json?'+params+'&count=50'
 					r = requests.get(url=search_url, auth=oauth)
-		search = trends[0]['trends'][0]['url']
-		#obtener parametros de busqueda de tweets
-		search_params = search.split('?')
-		search_url = 'https://api.twitter.com/1.1/search/tweets.json?'+search_params[1]
-		r = requests.get(url=search_url, auth=oauth)
-		twits = r.json()
-		texto = ''
-		for twit in twits['statuses']:
-			texto = texto + twit['text']
-		data = json.dumps(twits, indent=2)
 
-		natural_language_understanding = NaturalLanguageUnderstandingV1(
-    		version='2018-11-16',
-    		iam_apikey='VUJWvResSognuEFqEu3GAi_mBcR1fmFvrce-5JRWLhqr',
-    		url='https://gateway.watsonplatform.net/natural-language-understanding/api'
-			)
+					twits = r.json()
+					texto = ''
+					for twit in twits['statuses']:
+						texto = texto + twit['text']
+					texto = re.sub(r'[^\x00-\x7f]',r' ',texto)
+					print(texto)
 
-		response = natural_language_understanding.analyze(
-    	text=texto,
-    	features=Features(concepts=ConceptsOptions(limit=20))).get_result()
-		data = json.dumps(response, indent=2)
-		print(json.dumps(response, indent=2))
+					response = send_request(texto)
+					data = json.dumps(response, indent=2)
+					
+					return JsonResponse(json.loads(data), safe=False)
+	
+		data = {
+			'response': 'no disaster trend'
+		}
+		data = json.dumps(data, indent=2)
 		return JsonResponse(json.loads(data), safe=False)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-		return JsonResponse(json.loads(data), safe=False)
-    	
